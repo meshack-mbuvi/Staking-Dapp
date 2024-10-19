@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 contract StakingDapp is Ownable, ReentrancyGuard {
-  using SafeERC20 from IERC20;
+  using SafeERC20 for IERC20;
 
   struct UserInfo {
     // Amount of tokens deposited
@@ -147,10 +147,40 @@ contract StakingDapp is Ownable, ReentrancyGuard {
     require(token_balance - amount >= depositedTokens[tokens], "Can't withdraw deposited tokens")
   }
 
-  function modifyPool(){}
+  function modifyPool(uint _pid, uint _apy) public onlyOwner{
+    PoolInfo storage pool = poolInfo[_pid];
+    pool.apy = _apy;
+  }
 
-  function claimReward(){}
-  function createNotification(){}
-  function getNotification(){}
+  function claimReward(uint _pid) nonReentrant{
+    PoolInfo storage pool = poolInfo[_pid];
+    UserInfo storage user = userInfo[_pid][msg.sender];
+
+    require(user.lockUntil <= block.timestamp, "Lock is active");
+    uint256 pending = _calcPendingReward(user, _pid);
+
+    require(pending > 0, "No reward to claim");
+    user.lastRewardAttempt = block.timestamp;
+
+    pool.rewardToken.transfer(msg.sender);
+
+    _createNotification( _pid, _amount, msg.sender, "Claim");
+
+  }
+  function createNotification(
+    uint _pid, uint _amount, address _user,
+    string memory _typeOf
+  )internal{
+    notification.push({
+      poolId: _pid,
+      amount: _amount,
+      user: _user,
+      typeOf: _typeOf,
+      timestamp: block.timestamp,
+    })
+  }
+  function getNotification() public view returns(Notification[] memory) {
+    return notifications;
+  }
 
 }
